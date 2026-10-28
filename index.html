@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Neuraxis Tract Explorer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<h1>Neuraxis Tract Explorer</h1>
+<p>Cortex → spinal cord (top to bottom). Hover a tract to see it move (▲ ascending, ▼ descending); click to pin and read. Cross-sections show both sides (dorsal at top).</p>
+</header>
+<main>
+<nav id="side" class="card" aria-label="Tracts">
+</nav>
+<div id="dia" class="card">
+<svg id="dsv" viewBox="0 0 210 520" role="img" aria-label="Longitudinal schematic of the neuraxis">
+</svg>
+</div>
+<div id="right">
+<div id="info" class="card">
+</div>
+<div id="grid">
+</div>
+</div>
+</main>
+<label id="szc">Section size <input id="sz" type="range" min="360" max="820" step="20" value="560">
+</label>
+
+<script src="script.js"></script>
+</body>
+</html>
