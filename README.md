@@ -2,7 +2,7 @@
 
 An interactive web tool for exploring major ascending and descending neural tracts, brainstem nuclei, cerebellar peduncles, and cranial nerves (CN I-XII) across 11 cross-sectional levels of the brain and spinal cord.
 
-## Features
+## New Features
 
 - **3D and 2D Views**: View pathways on a 2D schematic alongside a 3D brain model (`ICBM152`) showing where each cross-sectional slice and tract sits in space. Includes camera presets, zoom controls, and an opacity slider.
 - **Cross-Sectional Slice Modes**: Switch between vector diagrams, Weigert stain, T1-weighted MRI, and Luxol Fast Blue views across all 11 levels.
