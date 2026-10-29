@@ -5,29 +5,294 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Neuraxis Tract Explorer</title>
   <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
 </head>
-<body>
-<header>
-<h1>Neuraxis Tract Explorer</h1>
-<p>Cortex → spinal cord (top to bottom). Hover a tract to see it move (▲ ascending, ▼ descending); click to pin and read. Cross-sections show both sides (dorsal at top).</p>
-</header>
-<main>
-<nav id="side" class="card" aria-label="Tracts">
-</nav>
-<div id="dia" class="card">
-<svg id="dsv" viewBox="0 0 210 520" role="img" aria-label="Longitudinal schematic of the neuraxis">
-</svg>
-</div>
-<div id="right">
-<div id="info" class="card">
-</div>
-<div id="grid">
-</div>
-</div>
-</main>
-<label id="szc">Section size <input id="sz" type="range" min="360" max="820" step="20" value="560">
-</label>
+<body data-mode="vector" data-lat="pathway" class="show-dec">
+  <header id="topbar">
+    <div class="brand">
+      <div class="brand-icon" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M16 4C10 4 5 8.5 5 14c0 3.8 2.2 7 5.5 8.5L12 28h8l1.5-5.5C24.8 21 27 17.8 27 14c0-5.5-5-10-11-10z" opacity="0.25" fill="currentColor"/>
+          <path d="M16 4v24M10 9c3 2 9 2 12 0M9 15c4 3 10 3 14 0M12 21l8-4M12 17l8 4" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div>
+        <h1>Neuraxis Tract Explorer</h1>
+      </div>
+    </div>
 
-<script src="script.js"></script>
+    <div class="toolbar-controls">
+      <!-- Quiz Me! Button -->
+      <button type="button" class="quiz-launch-btn" id="quiz-btn" title="Launch an interactive neuroanatomy quiz">
+        <span>🎓 Quiz Me!</span>
+      </button>
+
+      <!-- Stain / Rendering Mode Switcher (Vector is default) -->
+      <div class="ctrl-group" role="group" aria-label="Slice Rendering Mode">
+        <span class="ctrl-label">Slice Mode</span>
+        <div class="seg-ctrl" id="mode-ctrl">
+          <button type="button" class="seg-btn active" data-mode="vector" title="Clean anatomical vector atlas">Vector</button>
+          <button type="button" class="seg-btn" data-mode="weigert" title="Weigert iron-hematoxylin myelin-stained cross-sections">Weigert Stain</button>
+          <button type="button" class="seg-btn" data-mode="mri" title="ICBM152 / 7T T1-weighted MRI cross-sections">MRI (T1w)</button>
+          <button type="button" class="seg-btn" data-mode="lfb" title="Luxol Fast Blue + Cresyl Violet histological stain">Luxol Blue</button>
+        </div>
+      </div>
+
+      <!-- Laterality Mode Switcher -->
+      <div class="ctrl-group" role="group" aria-label="Pathway Laterality">
+        <span class="ctrl-label">Laterality</span>
+        <div class="seg-ctrl" id="lat-ctrl">
+          <button type="button" class="seg-btn active" data-lat="pathway" title="Emphasize active conduction side (ipsilateral vs contralateral across decussation)">Pathway Side</button>
+          <button type="button" class="seg-btn" data-lat="bilateral" title="Highlight both left and right sides equally">Bilateral</button>
+        </div>
+      </div>
+
+      <!-- Filter Active Slices Toggle (Auto-enabled when selecting a tract) -->
+      <button type="button" class="toggle-pill active" id="filter-active-btn" title="Automatically show only cross-sections containing the selected tract or nucleus">
+        <span class="pill-dot"></span>
+        <span>Active Slices Only</span>
+      </button>
+
+      <!-- Decussations Always Visible Toggle -->
+      <button type="button" class="toggle-pill active" id="show-dec-btn" title="Show decussating fiber trajectories in cross-sections">
+        <span>✕ Decussations</span>
+      </button>
+
+      <!-- Section Size Slider -->
+      <label class="size-ctrl" id="szc" title="Adjust thumbnail card width">
+        <span>Grid</span>
+        <input id="sz" type="range" min="260" max="680" step="20" value="340">
+      </label>
+
+      <!-- Theme Toggle -->
+      <button type="button" class="icon-btn" id="theme-btn" title="Toggle Dark / Light Theme" aria-label="Toggle Dark or Light Theme">
+        <svg class="sun-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41"/>
+        </svg>
+      </button>
+
+      <!-- Help / How to Use (?) Button -->
+      <button type="button" class="icon-btn help-btn" id="help-btn" title="How to use Neuraxis Tract Explorer (?)" aria-label="How to use this tool">
+        <span>?</span>
+      </button>
+    </div>
+  </header>
+
+  <main id="app-layout">
+    <!-- Left Column: Search & Tract/Structure Directory -->
+    <aside id="side-panel" class="card" aria-label="Tracts and Structures Directory">
+      <div class="search-box">
+        <svg class="search-ic" viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="8.5" cy="8.5" r="5.5"/><path d="M13 13l4 4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" id="search-input" placeholder="Search tracts, nuclei, syndromes… (/)" autocomplete="off" spellcheck="false">
+        <kbd id="search-kbd" title="Press / to search">/</kbd>
+        <button type="button" id="search-clear" class="hidden" aria-label="Clear search">&times;</button>
+      </div>
+
+      <div class="cat-tabs" id="cat-tabs" role="tablist">
+        <button type="button" class="cat-tab active" data-cat="all">All</button>
+        <button type="button" class="cat-tab" data-cat="a" title="Ascending Sensory Pathways">▲ Asc</button>
+        <button type="button" class="cat-tab" data-cat="d" title="Descending Motor Pathways">▼ Desc</button>
+        <button type="button" class="cat-tab" data-cat="n" title="Cranial Nerves I–XII">◆ CN</button>
+        <button type="button" class="cat-tab" data-cat="st" title="Cortical, Thalamic, Basal Ganglia & Cerebellar Structures">● Nuclei</button>
+      </div>
+
+      <nav id="side" aria-label="Pathway list"></nav>
+      <div class="resize-edge resize-edge-r" id="resize-side" title="Drag edge to resize sidebar width (double-click to reset)"></div>
+    </aside>
+
+    <!-- Center Column: 3D Brain Model & Longitudinal Schematic (Default: 3D + 2D Split) -->
+    <section id="dia" class="card" data-viz="split" aria-label="3D Brain and Longitudinal Schematic">
+      <div class="dia-header">
+        <div class="seg-ctrl" id="viz-ctrl">
+          <button type="button" class="seg-btn active" data-viz="split" title="Show both 3D Brain Model and 2D Longitudinal Schematic">3D + 2D</button>
+          <button type="button" class="seg-btn" data-viz="3d" title="Full Interactive 3D Brain Model">3D Brain</button>
+          <button type="button" class="seg-btn" data-viz="2d" title="2D Longitudinal Pathway Schematic">2D Schematic</button>
+        </div>
+        <div class="brain3d-actions">
+          <button type="button" class="mini-btn" id="zoom-out-3d" title="Zoom out 3D Brain">−</button>
+          <button type="button" class="mini-btn" id="zoom-in-3d" title="Zoom in 3D Brain">+</button>
+          <button type="button" class="mini-btn" id="reset-cam-btn" title="Reset 3D camera view">Reset</button>
+        </div>
+      </div>
+
+      <div class="brain3d-subbar" id="brain3d-subbar">
+        <label class="opacity-ctrl" title="Adjust 3D Brain surface & nuclear opacity">
+          <span>3D Opacity</span>
+          <input id="brain-opacity" type="range" min="0.05" max="1" step="0.05" value="0.50">
+          <span id="brain-opacity-val">50%</span>
+        </label>
+      </div>
+
+      <!-- 3D Brain Viewport -->
+      <div id="brain3d-wrap">
+        <canvas id="brain3d-canvas"></canvas>
+        <div id="brain3d-hud">
+          <span class="hud-pill" id="hud-slice-label">Slice: Cervical Cord</span>
+          <span class="hud-hint">Drag to orbit · Scroll to zoom · Click slice plane</span>
+        </div>
+      </div>
+
+      <!-- Horizontal Resizer between 3D Brain and 2D Schematic -->
+      <div class="resize-split-h" id="resize-dia-split" title="Drag up/down to adjust 3D vs 2D height (double-click to reset)"><span></span></div>
+
+      <!-- 2D Longitudinal Schematic -->
+      <div id="dsv-wrap">
+        <div class="dsv-legend">
+          <span><strong>L</strong> Left (Ipsi)</span>
+          <span><strong>R</strong> Right (Contra)</span>
+        </div>
+        <svg id="dsv" viewBox="0 0 210 520" role="img" aria-label="Longitudinal schematic of the neuraxis"></svg>
+      </div>
+
+      <div class="resize-edge resize-edge-r" id="resize-dia" title="Drag edge to resize 3D/2D Explorer width (double-click to reset)"></div>
+    </section>
+
+    <!-- Right Column: Clinical Inspector + Spotlight Visualizer + Cross-Section Grid + Active Quiz Stage -->
+    <section id="right">
+      <!-- Interactive Quiz Stage (Shown when a Quiz is active) -->
+      <div id="quiz-stage" class="card hidden" aria-live="polite"></div>
+
+      <!-- Standard Explorer View -->
+      <div id="explorer-stage">
+        <div class="info-container">
+          <div id="info" class="card"></div>
+          <div class="resize-bar-h" id="resize-info" title="Drag bottom edge to resize clinical inspector height (double-click to reset)"><span></span></div>
+        </div>
+
+        <div id="grid-toolbar">
+          <div class="grid-status" id="grid-status">Showing all 11 anatomical levels — click any item to select or click '⤢ Spotlight' to zoom in</div>
+          <div class="toolbar-right-actions">
+            <button type="button" class="mini-btn hidden" id="show-all-slices-btn" title="Temporarily show all 11 slices">Show All 11 Slices</button>
+            <div class="pathway-stepper hidden" id="pathway-stepper">
+              <button type="button" class="step-btn" id="step-prev" title="Focus previous slice in pathway">← Prev Slice</button>
+              <span id="step-indicator">Slice 1 / 8</span>
+              <button type="button" class="step-btn" id="step-next" title="Focus next slice in pathway">Next Slice →</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="grid"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- How to Use (?) Modal -->
+  <div class="modal-backdrop hidden" id="help-modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title">
+    <div class="modal-card card">
+      <div class="modal-header">
+        <h2 id="help-modal-title">How to Use Neuraxis Tract Explorer</h2>
+        <button type="button" class="modal-close" id="help-close-btn" aria-label="Close help">&times;</button>
+      </div>
+      <div class="modal-body help-grid">
+        <div class="help-item">
+          <h3>1. Explore Tracts, Nerves &amp; Nuclei</h3>
+          <p>Click any pathway, cranial nerve (<strong>CN I–XII</strong>), or brain nucleus in the left directory—or click directly on any structure inside a cross-section slice—to select it. Selecting a pathway automatically filters the view to the slices where it is present and opens its key level in <strong>Spotlight</strong> mode.</p>
+        </div>
+        <div class="help-item">
+          <h3>2. Search by Anatomy or Clinical Syndrome</h3>
+          <p>Press <kbd>/</kbd> to search across tracts, sub-nuclei (e.g., <em>Nucleus ambiguus</em>, <em>Edinger-Westphal</em>), or clinical syndromes (e.g., <em>Wallenberg</em>, <em>Weber</em>, <em>Brown-Séquard</em>, <em>INO</em>, <em>Horner</em>).</p>
+        </div>
+        <div class="help-item">
+          <h3>3. 3D Brain &amp; 2D Longitudinal Schematic</h3>
+          <p>Drag on the <strong>3D Brain</strong> to orbit, scroll or use <strong>− / +</strong> to zoom, and adjust the <strong>3D Opacity</strong> slider to see deep subcortical nuclei and 3D fiber pathways. Click any cutting plane in the 3D brain or level block in the 2D schematic to jump straight to that slice.</p>
+        </div>
+        <div class="help-item">
+          <h3>4. Slice Modes, Laterality &amp; Decussations</h3>
+          <p>Switch between <strong>Vector</strong>, <strong>Weigert Stain</strong>, <strong>MRI (T1w)</strong>, and <strong>Luxol Blue</strong> in the top bar. Toggle <strong>Pathway Side</strong> vs. <strong>Bilateral</strong> to see how ascending and descending tracts cross at decussation levels (marked with <strong>✕</strong>).</p>
+        </div>
+        <div class="help-item">
+          <h3>5. Spotlight &amp; Resizable Panels</h3>
+          <p>Click <strong>⤢ Spotlight</strong> (or any slice title) to expand that slice across the top of the grid. You can also <strong>click and drag the edges</strong> of the sidebar, the 3D/2D column, the inspector card, or any slice card to resize them (double-click any edge to reset).</p>
+        </div>
+        <div class="help-item">
+          <h3>6. 🎓 Quiz Me! Mode</h3>
+          <p>Click <strong>🎓 Quiz Me!</strong> in the header to test yourself! Choose which anatomical slices to include, toggle ascending/descending direction animations on or off, and pick between <strong>Multiple Choice</strong>, <strong>Type the Name</strong>, or <strong>Label All on Slice</strong>.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="primary-btn" id="help-got-it-btn">Got it!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quiz Me! Configuration Modal -->
+  <div class="modal-backdrop hidden" id="quiz-modal" role="dialog" aria-modal="true" aria-labelledby="quiz-modal-title">
+    <div class="modal-card card quiz-setup-card">
+      <div class="modal-header">
+        <h2 id="quiz-modal-title">🎓 Configure Your Neuroanatomy Quiz</h2>
+        <button type="button" class="modal-close" id="quiz-close-btn" aria-label="Close quiz setup">&times;</button>
+      </div>
+      <div class="modal-body quiz-setup-body">
+        <!-- 1. Question Format -->
+        <div class="setup-section">
+          <label class="setup-label">1. Question Format</label>
+          <div class="quiz-mode-cards" id="quiz-format-select">
+            <button type="button" class="qmode-card active" data-qmode="mcq">
+              <strong>Multiple Choice</strong>
+              <span>A structure is highlighted on the slice; pick its correct name from 4 options.</span>
+            </button>
+            <button type="button" class="qmode-card" data-qmode="type">
+              <strong>Type the Name</strong>
+              <span>A structure is highlighted on the slice; type its name or abbreviation.</span>
+            </button>
+            <button type="button" class="qmode-card" data-qmode="label">
+              <strong>Label the Slice</strong>
+              <span>Given all structure names in a slice, match and label each structure on the diagram.</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. Ascending / Descending Animations & Number of Questions -->
+        <div class="setup-row-2col">
+          <div class="setup-section">
+            <label class="setup-label">2. Ascending / Descending Animations</label>
+            <div class="seg-ctrl full-seg" id="quiz-anim-select">
+              <button type="button" class="seg-btn active" data-qanim="show">Show ▲/▼ Animations</button>
+              <button type="button" class="seg-btn" data-qanim="hide">Hide Animations (Harder)</button>
+            </div>
+          </div>
+
+          <div class="setup-section">
+            <label class="setup-label">3. Number of Questions / Rounds</label>
+            <div class="seg-ctrl full-seg" id="quiz-count-select">
+              <button type="button" class="seg-btn" data-qcount="5">5</button>
+              <button type="button" class="seg-btn active" data-qcount="10">10</button>
+              <button type="button" class="seg-btn" data-qcount="15">15</button>
+              <button type="button" class="seg-btn" data-qcount="20">20</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Included Slices -->
+        <div class="setup-section">
+          <div class="setup-label-row">
+            <label class="setup-label">4. Included Anatomical Slices</label>
+            <div class="slice-preset-btns">
+              <button type="button" class="mini-btn" data-slice-preset="all">All 11</button>
+              <button type="button" class="mini-btn" data-slice-preset="stem">Brainstem &amp; Cord</button>
+              <button type="button" class="mini-btn" data-slice-preset="fore">Forebrain &amp; Cb</button>
+              <button type="button" class="mini-btn" data-slice-preset="none">Clear</button>
+            </div>
+          </div>
+          <div class="quiz-slice-grid" id="quiz-slice-checks"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <span class="quiz-pool-info" id="quiz-pool-info">Ready to generate quiz</span>
+        <button type="button" class="primary-btn" id="quiz-start-btn">Start Quiz →</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="script.js"></script>
 </body>
 </html>
