@@ -13,7 +13,7 @@ function mniToScene(xMm, yMm, zMm) {
   return new THREE.Vector3(xMm * SCALE, (zMm + 12) * SCALE, yMm * SCALE);
 }
 
-// All 11 anatomical levels mapped to real MNI152 stereotaxic coordinates
+// All 12 anatomical levels mapped to real MNI152 stereotaxic coordinates
 export const SLICE_3D_MAP = {
   cx:  { x: 0, yMm: -10, zMm:  46, rx: 2.75, rz: 3.30, tiltX:  0.00, label: 'Cerebral Cortex (Gyri & Sulci)' },
   th:  { x: 0, yMm: -16, zMm:   8, rx: 2.55, rz: 2.15, tiltX:  1.35, label: 'Thalamus, Basal Ganglia & Internal Capsule' },
@@ -25,7 +25,9 @@ export const SLICE_3D_MAP = {
   rm:  { x: 0, yMm: -39, zMm: -47, rx: 0.78, rz: 0.72, tiltX: -0.08, label: 'Rostral Medulla (Inferior Olive & 4th Ventricle)' },
   mm:  { x: 0, yMm: -41, zMm: -55, rx: 0.68, rz: 0.64, tiltX: -0.05, label: 'Mid Medulla (Sensory Decussation / Internal Arcuate)' },
   cm:  { x: 0, yMm: -43, zMm: -63, rx: 0.62, rz: 0.58, tiltX: -0.03, label: 'Caudal Medulla (Pyramidal Motor Decussation)' },
-  c:   { x: 0, yMm: -45, zMm: -76, rx: 0.56, rz: 0.50, tiltX:  0.00, label: 'Cervical Spinal Cord' }
+  c:   { x: 0, yMm: -45, zMm: -76, rx: 0.56, rz: 0.50, tiltX:  0.00, label: 'Cervical Spinal Cord' },
+  // Schematic position below the cervical plane (matches the 'cs' route node); the real lumbar cord lies far lower
+  lum: { x: 0, yMm: -46, zMm: -88, rx: 0.52, rz: 0.46, tiltX:  0.00, label: 'Lumbar Spinal Cord' }
 };
 
 // Longitudinal schematic nodes mapped to MNI (yMm, zMm, xSpreadMm)

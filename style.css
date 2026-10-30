@@ -744,14 +744,6 @@ body.is-resizing * {
   padding: 4px 6px;
 }
 
-.dsv-legend {
-  display: flex;
-  justify-content: space-between;
-  padding: 2px 10px;
-  font-size: 10px;
-  color: var(--mut);
-}
-
 #dsv {
   width: 100%;
   height: 100%;
@@ -807,6 +799,193 @@ body.is-resizing * {
   fill: var(--card);
   stroke: var(--dec);
   stroke-width: 2;
+}
+
+/* ---- 2D schematic: level margin, columns, route markers ---- */
+.bl.gut {
+  text-anchor: end;
+  font-size: 7.2px;
+  fill: var(--mut);
+}
+
+.bl.gut.on-path {
+  fill: var(--tx);
+  font-weight: 700;
+}
+
+.blk.on-path:not(.active-lv):not(.lesion-lv) {
+  fill: color-mix(in srgb, var(--acc) 12%, var(--wm));
+}
+
+.dsv-col {
+  font-size: 7.5px;
+  font-weight: 600;
+  fill: var(--mut);
+  text-anchor: middle;
+}
+
+.dsv-mid {
+  stroke: var(--bd-strong);
+  stroke-width: 0.8;
+  stroke-dasharray: 2 3;
+  pointer-events: none;
+}
+
+.dec-x {
+  font-size: 6.5px;
+  font-weight: 800;
+  fill: var(--dec);
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+.fl-mark {
+  stroke-width: 2;
+}
+
+.fl-mark.start {
+  fill: var(--c);
+  stroke: var(--card);
+}
+
+.fl-mark.end {
+  fill: var(--card);
+  stroke: var(--c);
+  stroke-width: 2.6;
+}
+
+.fl-tag {
+  font-size: 7px;
+  font-weight: 700;
+  fill: var(--tx);
+  paint-order: stroke;
+  stroke: var(--card-alt);
+  stroke-width: 2.5px;
+  pointer-events: none;
+}
+
+/* ---- Route card under the schematic ---- */
+.route-card {
+  flex: none;
+  max-height: 42%;
+  min-height: 64px;
+  overflow-y: auto;
+  border-top: 1px solid var(--bd);
+  margin-top: 4px;
+  padding: 6px 4px 2px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--tx);
+}
+
+.rc-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.rc-head .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.rc-head strong {
+  font-size: 12px;
+}
+
+.rc-dir {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--mut);
+  white-space: nowrap;
+}
+
+.rc-rows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 8px;
+  margin: 0;
+}
+
+.rc-rows dt {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+  color: var(--mut);
+  white-space: nowrap;
+}
+
+.rc-rows dd {
+  margin: 0;
+}
+
+.rc-lv {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 99px;
+  background: var(--acc-soft);
+  color: var(--acc);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.rc-lv.les {
+  background: color-mix(in srgb, #d0242a 14%, transparent);
+  color: #d0242a;
+}
+
+.rc-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  vertical-align: -1px;
+  flex: none;
+}
+
+.rc-ico.start {
+  background: var(--c, var(--acc));
+}
+
+.rc-ico.end {
+  border: 2.5px solid var(--c, var(--acc));
+  box-sizing: border-box;
+}
+
+.rc-ico.cross {
+  border: 1.5px solid var(--dec);
+  color: var(--dec);
+  font-size: 7px;
+  font-weight: 800;
+  box-sizing: border-box;
+}
+
+.rc-route {
+  margin-top: 5px;
+  font-size: 10.5px;
+  color: var(--mut);
+}
+
+.rc-route span {
+  font-weight: 700;
+  margin-right: 3px;
+}
+
+.rc-note {
+  margin: 0 0 4px;
+  color: var(--mut);
+}
+
+.route-card .related-pills {
+  margin-top: 2px;
 }
 
 /* ---- Right Column: Inspector & Cross-Section Grid ---- */
@@ -1012,13 +1191,20 @@ body.is-resizing * {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(var(--sw, 340px), 100%), 1fr));
   gap: 12px;
-  align-items: start;
+  align-items: stretch;
 }
 
+/* Each card spans two grid rows (header, image) and shares them with its neighbours through subgrid, so a
+   title that wraps onto more lines makes the whole row's headers taller and every image starts at the same line. */
 .sec {
   padding: 10px 12px;
   transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
   position: relative;
+  display: grid;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
+  row-gap: 6px;
+  align-content: start;
 }
 
 /* Spotlight / Zoomed Hero Slice Mode */
@@ -1046,7 +1232,6 @@ body.is-resizing * {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 6px;
 }
 
 .sec h4 {
@@ -1140,6 +1325,7 @@ body.is-resizing * {
   height: auto;
   max-height: var(--sec-h, 44vh);
   display: block;
+  align-self: start;
   border-radius: 10px;
   background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--acc) 7%, transparent), transparent 72%);
 }
@@ -1258,10 +1444,6 @@ body[data-lat="pathway"] .sh.on.contra-ghost {
   opacity: 0.24;
   pointer-events: none;
   transition: opacity 0.2s, stroke-width 0.2s;
-}
-
-body:not(.show-dec) .dec-path:not(.on) {
-  display: none;
 }
 
 .dec-path.dim {
@@ -1605,6 +1787,74 @@ body:not([data-mode="vector"]) .st:not(.on) {
   line-height: 1.48;
 }
 
+.help-item ul,
+.help-quick ol {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.48;
+  color: var(--tx);
+}
+
+.help-item li + li,
+.help-quick li + li {
+  margin-top: 4px;
+}
+
+.help-intro,
+.help-quick,
+.help-note {
+  grid-column: 1 / -1;
+}
+
+.help-intro {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--tx);
+}
+
+.help-quick {
+  background: var(--acc-soft);
+  border: 1px solid color-mix(in srgb, var(--acc) 35%, transparent);
+  border-radius: 10px;
+  padding: 11px 13px;
+}
+
+.help-quick h3 {
+  margin: 0 0 6px;
+  font-size: 13.5px;
+  color: var(--acc);
+}
+
+.help-quick ol {
+  font-size: 12.5px;
+}
+
+.help-note {
+  margin: 0;
+  font-size: 11px;
+  color: var(--mut);
+}
+
+.help-keys {
+  font-size: 11.5px;
+  color: var(--mut);
+}
+
+#help-modal kbd {
+  display: inline-block;
+  min-width: 1.4em;
+  padding: 0 5px;
+  border: 1px solid var(--bd);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--card);
+  font: 600 11px/1.5 ui-monospace, monospace;
+  text-align: center;
+  color: var(--tx);
+}
+
 /* ---- Quiz Setup Modal Controls ---- */
 .quiz-setup-body {
   display: flex;
@@ -1674,6 +1924,26 @@ body:not([data-mode="vector"]) .st:not(.on) {
 
 .qmode-card strong {
   font-size: 13px;
+}
+
+.qmode-group {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--mut);
+}
+
+.qmode-group:first-child {
+  margin-top: 0;
+}
+
+/* a setup option that does not apply to the chosen question format */
+.setup-section.setup-off {
+  opacity: 0.4;
+  pointer-events: none;
 }
 
 .qmode-card span {
@@ -1805,6 +2075,28 @@ body.quiz-active #side-panel .cat-tabs {
   .quiz-main-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* questions without a slice (presentations, functions) use a single centred column */
+.quiz-main-grid.no-slice {
+  grid-template-columns: minmax(0, 760px);
+  justify-content: center;
+}
+
+.quiz-vignette {
+  background: var(--card-alt);
+  border: 1px solid var(--bd);
+  border-left: 3px solid var(--acc);
+  border-radius: 8px;
+  padding: 10px 13px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.mcq-btn.long {
+  align-items: flex-start;
+  font-size: 12.5px;
+  line-height: 1.45;
 }
 
 .quiz-slice-box {
@@ -2272,12 +2564,14 @@ body.quiz-active #side-panel .cat-tabs {
 }
 
 /* ---- Spinal cord lesion mode ---- */
-.sh.hit {
+.sh.hit,
+.st.hit {
   stroke: #d0242a;
   stroke-width: 2;
   filter: drop-shadow(0 0 5px #d0242a);
 }
-.sh.part {
+.sh.part,
+.st.part {
   stroke: #e08a00;
   stroke-width: 1.8;
   stroke-dasharray: 2.5 1.5;

@@ -14,7 +14,7 @@
     }
   </script>
 </head>
-<body data-mode="vector" data-lat="pathway" class="show-dec">
+<body data-mode="vector" data-lat="pathway">
   <header id="topbar">
     <div class="brand">
       <div class="brand-icon" aria-hidden="true">
@@ -60,11 +60,6 @@
         <span>Active Slices Only</span>
       </button>
 
-      <!-- Decussations Always Visible Toggle -->
-      <button type="button" class="toggle-pill active" id="show-dec-btn" title="Show decussating fiber trajectories in cross-sections">
-        <span>✕ Decussations</span>
-      </button>
-
       <!-- Section Size Slider -->
       <label class="size-ctrl" id="szc" title="Adjust thumbnail card width">
         <span>Grid</span>
@@ -103,7 +98,7 @@
         <button type="button" class="cat-tab" data-cat="m" title="Motor and descending pathways">Motor</button>
         <button type="button" class="cat-tab" data-cat="c" title="Cerebellar pathways">Cerebellar</button>
         <button type="button" class="cat-tab" data-cat="n" title="Cranial nerves I–XII">Cranial nerves</button>
-        <button type="button" class="cat-tab" data-cat="l" title="Spinal cord and medullary lesion syndromes">Lesions</button>
+        <button type="button" class="cat-tab" data-cat="l" title="Spinal cord, brainstem and cerebral (arterial territory) lesion syndromes">Lesions</button>
       </div>
       <select id="level-filter" class="level-select" aria-label="Show only tracts present at a level"></select>
       <div id="filter-count" class="filter-count" aria-live="polite"></div>
@@ -149,11 +144,8 @@
 
       <!-- 2D Longitudinal Schematic -->
       <div id="dsv-wrap">
-        <div class="dsv-legend">
-          <span><strong>L</strong> Left (Ipsi)</span>
-          <span><strong>R</strong> Right (Contra)</span>
-        </div>
-        <svg id="dsv" viewBox="0 0 210 520" role="img" aria-label="Longitudinal schematic of the neuraxis"></svg>
+        <svg id="dsv" viewBox="0 0 264 536" role="img" aria-label="Longitudinal schematic of the neuraxis"></svg>
+        <div id="route-card" class="route-card" aria-live="polite"></div>
       </div>
 
       <div class="resize-edge resize-edge-r" id="resize-dia" title="Drag edge to resize 3D/2D Explorer width (double-click to reset)"></div>
@@ -172,9 +164,9 @@
         </div>
 
         <div id="grid-toolbar">
-          <div class="grid-status" id="grid-status">Showing all 11 anatomical levels — click any item to select or click '⤢ Spotlight' to zoom in</div>
+          <div class="grid-status" id="grid-status">Showing all 12 anatomical levels — click any item to select or click '⤢ Spotlight' to zoom in</div>
           <div class="toolbar-right-actions">
-            <button type="button" class="mini-btn hidden" id="show-all-slices-btn" title="Temporarily show all 11 slices">Show All 11 Slices</button>
+            <button type="button" class="mini-btn hidden" id="show-all-slices-btn" title="Temporarily show all 12 slices">Show All 12 Slices</button>
             <div class="pathway-stepper hidden" id="pathway-stepper">
               <button type="button" class="step-btn" id="step-prev" title="Focus previous slice in pathway">← Prev Slice</button>
               <span id="step-indicator">Slice 1 / 8</span>
@@ -196,36 +188,78 @@
         <button type="button" class="modal-close" id="help-close-btn" aria-label="Close help">&times;</button>
       </div>
       <div class="modal-body help-grid">
-        <div class="help-item">
-          <h3>1. Explore Tracts, Nerves &amp; Nuclei</h3>
-          <p>Click any pathway, cranial nerve (<strong>CN I–XII</strong>), or brain nucleus in the left directory—or click directly on any structure inside a cross-section slice—to select it. Hover to preview an item; click to pin it. A pinned pathway filters the view to the slices where it is present (use <strong>⤢ Spotlight</strong> on any slice to enlarge it).</p>
-        </div>
-        <div class="help-item">
-          <h3>2. Search by Anatomy or Clinical Syndrome</h3>
-          <p>Press <kbd>/</kbd> to search across tracts, sub-nuclei (e.g., <em>Nucleus ambiguus</em>, <em>Edinger-Westphal</em>), or clinical syndromes (e.g., <em>Wallenberg</em>, <em>Weber</em>, <em>Brown-Séquard</em>, <em>INO</em>, <em>Horner</em>).</p>
-        </div>
-        <div class="help-item">
-          <h3>2b. Lesion Syndromes</h3>
-          <p>Pick a spinal cord lesion (<em>central cord</em>, <em>anterior cord</em>, <em>posterior cord</em>, <em>Brown-Séquard</em>) or a medullary stroke (<em>lateral medullary / Wallenberg</em>, <em>medial medullary / Dejerine</em>) from the <strong>Spinal cord lesions</strong> and <strong>Brainstem strokes</strong> groups or the <strong>Lesions</strong> chip. The affected slice shades the lesion, marks damaged tracts in red, and the inspector lists the cause, deficits, bedside tests (<strong>How to check</strong>) and imaging. Unilateral lesions have a Left / Right toggle.</p>
-        </div>
-        <div class="help-item">
-          <h3>3. 3D Brain &amp; 2D Longitudinal Schematic</h3>
-          <p>Drag on the <strong>3D Brain</strong> to orbit, scroll or use <strong>− / +</strong> to zoom, and adjust the <strong>3D Opacity</strong> slider to see deep subcortical nuclei and 3D fiber pathways. Click any cutting plane in the 3D brain or level block in the 2D schematic to jump straight to that slice.</p>
-        </div>
-        <div class="help-item">
-          <h3>4. Slice Modes, Laterality &amp; Decussations</h3>
-          <p>Switch between <strong>Vector</strong>, <strong>Weigert Stain</strong>, <strong>MRI (T1w)</strong>, and <strong>Luxol Blue</strong> in the top bar. Toggle <strong>Pathway Side</strong> vs. <strong>Bilateral</strong> to see how ascending and descending tracts cross at decussation levels (marked with <strong>✕</strong>).</p>
-        </div>
-        <div class="help-item">
-          <h3>5. Spotlight &amp; Resizable Panels</h3>
-          <p>Click <strong>⤢ Spotlight</strong> (or any slice title) to expand that slice across the top of the grid. You can also <strong>click and drag the edges</strong> of the sidebar, the 3D/2D column, the inspector card, or any slice card to resize them (double-click any edge to reset).</p>
-        </div>
-        <div class="help-item">
-          <h3>6. 🎓 Quiz Me! Mode</h3>
-          <p>Click <strong>🎓 Quiz Me!</strong> in the header to test yourself! Choose which anatomical slices to include, toggle ascending/descending direction animations on or off, and pick between <strong>Multiple Choice</strong>, <strong>Type the Name</strong>, or <strong>Label All on Slice</strong>.</p>
-        </div>
+        <p class="help-intro">Choose a pathway, cranial nerve, brain structure or lesion, and the explorer shows where it runs through the brain and spinal cord: on the cross-sections, the 3D brain and the side-on schematic, with clinical notes in the info panel.</p>
+
+        <section class="help-quick" aria-labelledby="help-quick-title">
+          <h3 id="help-quick-title">Quick start</h3>
+          <ol>
+            <li><strong>Point at</strong> any item in the list on the left to preview it. <strong>Click</strong> it to pin it in place. You can also click a structure on a slice.</li>
+            <li><strong>Read</strong> the info panel at the top right: where it starts and ends, where it crosses the midline, what it does and what damage looks like.</li>
+            <li><strong>Follow it</strong> through the slices below. Only the levels it passes through are shown; use <strong>← Prev Slice</strong> / <strong>Next Slice →</strong> to step along it. Press <kbd>Esc</kbd> or <strong>Unpin ✕</strong> to start again.</li>
+          </ol>
+        </section>
+
+        <section class="help-item">
+          <h3>Find something</h3>
+          <ul>
+            <li>Press <kbd>/</kbd> and type a name, abbreviation or syndrome, for example <em>Wallenberg</em>, <em>INO</em> or <em>nucleus ambiguus</em>.</li>
+            <li>The chips under the search box (<strong>Sensory</strong>, <strong>Motor</strong>, <strong>Cerebellar</strong>, <strong>Cranial nerves</strong>, <strong>Lesions</strong>) narrow the list.</li>
+            <li>The level menu lists only what passes through one level.</li>
+          </ul>
+        </section>
+
+        <section class="help-item">
+          <h3>Read a slice</h3>
+          <ul>
+            <li>The back of the brain (dorsal) is at the top and the front (ventral) at the bottom.</li>
+            <li><strong>▲</strong> ascending (sensory), <strong>▼</strong> descending (motor), <strong>⇅</strong> both directions.</li>
+            <li><strong>✕</strong> and a dashed line mark where a pathway crosses the midline (a decussation).</li>
+            <li>The left half is the side the pathway starts on (ipsilateral), the right half the opposite side (contralateral). <strong>Pathway Side</strong> highlights the side it is on at each level; <strong>Bilateral</strong> lights both.</li>
+          </ul>
+        </section>
+
+        <section class="help-item">
+          <h3>Lesions and strokes</h3>
+          <ul>
+            <li>Open the <strong>Lesions</strong> chip, or the <strong>Spinal cord lesions</strong>, <strong>Cerebral strokes</strong> and <strong>Brainstem strokes</strong> groups in the list.</li>
+            <li>The shaded area is the lesion. Structures in <span class="lg-hit">red</span> are damaged; <span class="lg-part">amber</span> ones may be partly affected.</li>
+            <li>The info panel gives the cause, blood supply, signs, bedside tests (<strong>How to check</strong>), imaging and other names.</li>
+            <li>For a one-sided lesion, <strong>Left half</strong> / <strong>Right half</strong> flips the side.</li>
+          </ul>
+        </section>
+
+        <section class="help-item">
+          <h3>3D brain and schematic</h3>
+          <ul>
+            <li>Drag to rotate the 3D brain; scroll or use <strong>− / +</strong> to zoom, and <strong>Reset</strong> to recentre.</li>
+            <li>Lower <strong>3D Opacity</strong> to see the deep structures.</li>
+            <li>The 2D schematic traces the selected tract from its <strong>start</strong> to its <strong>end</strong>, with <strong>✕</strong> where it crosses the midline; the card underneath spells out each step and the route.</li>
+            <li>Click a level in the 2D schematic, or a slice plane in 3D, to jump to that slice.</li>
+          </ul>
+        </section>
+
+        <section class="help-item">
+          <h3>Change the view</h3>
+          <ul>
+            <li><strong>Slice Mode</strong>: a clean drawing (<strong>Vector</strong>) or a stain- or MRI-style rendering underneath it (<strong>Weigert Stain</strong>, <strong>MRI</strong>, <strong>Luxol Blue</strong>). These are illustrations, not photographs of real tissue.</li>
+            <li><strong>⤢ Spotlight</strong> (or a slice title) enlarges a slice; click again to shrink it.</li>
+            <li><strong>Active Slices Only</strong> hides levels the pinned item does not reach; <strong>Show All 12 Slices</strong> brings them back.</li>
+            <li>Drag the edge of any panel or slice to resize it (double-click to reset). The <strong>Grid</strong> slider sets the slice size.</li>
+          </ul>
+        </section>
+
+        <section class="help-item">
+          <h3>Test yourself</h3>
+          <ul>
+            <li><strong>🎓 Quiz Me!</strong> can ask you to identify structures on the slices (<strong>Multiple Choice</strong>, <strong>Type the Name</strong>, <strong>Label the Slice</strong>), work out a lesion from symptoms or from its shading, match a lesion to its presentation, or link structures and functions.</li>
+            <li>Pick the levels and number of questions; each answer comes with an explanation.</li>
+          </ul>
+        </section>
+
+        <p class="help-note">A study aid, not medical advice: positions on the slices are schematic, so check them against your own references.</p>
       </div>
       <div class="modal-footer">
+        <span class="help-keys"><kbd>/</kbd> search · <kbd>Esc</kbd> clear, unpin or close</span>
         <button type="button" class="primary-btn" id="help-got-it-btn">Got it!</button>
       </div>
     </div>
@@ -243,9 +277,10 @@
         <div class="setup-section">
           <label class="setup-label">1. Question Format</label>
           <div class="quiz-mode-cards" id="quiz-format-select">
+            <div class="qmode-group">Identify on a slice</div>
             <button type="button" class="qmode-card active" data-qmode="mcq">
               <strong>Multiple Choice</strong>
-              <span>A structure is highlighted on the slice; pick its correct name from 4 options.</span>
+              <span>A structure is highlighted on the slice; pick its correct name from 4 options (or press 1–4).</span>
             </button>
             <button type="button" class="qmode-card" data-qmode="type">
               <strong>Type the Name</strong>
@@ -254,6 +289,28 @@
             <button type="button" class="qmode-card" data-qmode="label">
               <strong>Label the Slice</strong>
               <span>Given all structure names in a slice, match and label each structure on the diagram.</span>
+            </button>
+            <div class="qmode-group">Clinical lesions</div>
+            <button type="button" class="qmode-card" data-qmode="lsx">
+              <strong>Lesion from Symptoms</strong>
+              <span>Read a patient's presentation and type the lesion syndrome.</span>
+            </button>
+            <button type="button" class="qmode-card" data-qmode="lsh">
+              <strong>Lesion from Shading</strong>
+              <span>A lesion is shaded on a cross-section; type the syndrome.</span>
+            </button>
+            <button type="button" class="qmode-card" data-qmode="sxl">
+              <strong>Symptoms of a Lesion</strong>
+              <span>Given a syndrome, pick the matching presentation from 4 (or press 1–4).</span>
+            </button>
+            <div class="qmode-group">Function</div>
+            <button type="button" class="qmode-card" data-qmode="sfn">
+              <strong>Structure from Function</strong>
+              <span>Given what it does, pick the tract, nerve or structure from 4.</span>
+            </button>
+            <button type="button" class="qmode-card" data-qmode="fns">
+              <strong>Function of a Structure</strong>
+              <span>Given a tract, nerve or structure, pick what it does from 4.</span>
             </button>
           </div>
         </div>
@@ -269,7 +326,7 @@
           </div>
 
           <div class="setup-section">
-            <label class="setup-label">3. Number of Questions / Rounds</label>
+            <label class="setup-label" id="quiz-count-label">3. Number of Questions</label>
             <div class="seg-ctrl full-seg" id="quiz-count-select">
               <button type="button" class="seg-btn" data-qcount="5">5</button>
               <button type="button" class="seg-btn active" data-qcount="10">10</button>
@@ -284,7 +341,7 @@
           <div class="setup-label-row">
             <label class="setup-label">4. Included Anatomical Slices</label>
             <div class="slice-preset-btns">
-              <button type="button" class="mini-btn" data-slice-preset="all">All 11</button>
+              <button type="button" class="mini-btn" data-slice-preset="all">All 12</button>
               <button type="button" class="mini-btn" data-slice-preset="stem">Brainstem &amp; Cord</button>
               <button type="button" class="mini-btn" data-slice-preset="fore">Forebrain &amp; Cb</button>
               <button type="button" class="mini-btn" data-slice-preset="none">Clear</button>
