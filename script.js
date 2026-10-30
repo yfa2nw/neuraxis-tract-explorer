@@ -376,8 +376,8 @@ const base = {
 
   th: () => `${sliceImgTag("th", 400, 200)}
     <path class="w" d="M16,102 C16,44 64,8 198,8 C332,8 384,44 384,102 C384,158 340,192 200,192 C60,192 16,158 16,102 Z"/>
-    <text class="lb" x="130" y="194">Left Hemisphere: Basal Ganglia &amp; Internal Capsule</text>
-    <text class="lb" x="275" y="194">Right Hemisphere: Thalamic Nuclei</text>`,
+    <text class="lb" x="118" y="194">Left: basal ganglia &amp; internal capsule</text>
+    <text class="lb" x="292" y="194">Right: thalamic nuclei</text>`,
 
   cbl: () => `${sliceImgTag("cbl", 400, 200)}
     <ellipse class="w" cx="200" cy="104" rx="176" ry="86"/>
@@ -505,12 +505,11 @@ const SEC = [
 ];
 
 let sel = null;
+let hov = null; // hovered item: previewed only while nothing is pinned
 let currentMode = "vector"; // Default to clean Vector Atlas mode
 let currentLat = "pathway";
 let filterActiveOnly = true; // Auto-filter to active slices when a tract is selected!
 let showDecussations = true;
-let activeCategory = "all";
-let searchQuery = "";
 let spotlightSlice = null;   // The slice currently expanded as the biggest/zoomed hero card
 let brain3d = null;
 
@@ -548,6 +547,12 @@ function renderDecussations(lv) {
   }).join("");
 }
 
+// Lesion layer for the cervical cord slice: an (initially empty) group that lesion shading is drawn into, clipped to the cord outline
+const CORD_D = "M99,36 C82,34 56,38 34,54 C14,68 6,84 8,102 C10,124 22,144 44,156 C64,166 84,166 97,160 L98,136 L100,136 L102,160 C116,166 136,166 156,156 C178,144 190,124 192,102 C194,84 186,68 166,54 C144,38 118,34 101,36 L100,58 Z";
+const RM_D = "M58,36 C40,34 22,48 18,72 C14,98 22,126 36,146 C48,160 66,174 96,174 L100,154 L104,174 C134,174 152,160 164,146 C178,126 186,98 182,72 C178,48 160,34 142,36 L124,48 C114,54 106,56 100,58 C94,56 86,54 76,48 Z";
+const LESION_CLIPS = { c: CORD_D, rm: RM_D };   // slices that can show a lesion, with the outline the shading is clipped to
+const lesionLayer = lv => `<defs><clipPath id="clip-${lv}"><path d="${LESION_CLIPS[lv]}"/></clipPath></defs><g class="lov"></g>`;
+
 function sh(lv) {
   let s = base[lv]() + renderDecussations(lv);
   const customLv = CUSTOM_SHAPES[lv] || {};
@@ -566,7 +571,7 @@ function sh(lv) {
       s += `<text class="ar ${t.d == "a" ? "u" : t.d == "d" ? "d" : "b"}" data-id="${t.id}" data-side="${side}" x="${cx}" y="${y + 3}">${AR[t.d]}</text>`;
     });
   }));
-  return lab(lv) + s + '<text class="lb" x="100" y="10" style="font-size:7.5px">Dorsal (Posterior)</text><text class="lb" x="100" y="197" style="font-size:7.5px">Ventral (Anterior)</text>';
+  return lab(lv) + s + (LESION_CLIPS[lv] ? lesionLayer(lv) : "") + '<text class="lb" x="100" y="10" style="font-size:7.5px">Dorsal (Posterior)</text><text class="lb" x="100" y="197" style="font-size:7.5px">Ventral (Anterior)</text>';
 }
 
 const fore = k => base[k]() + FB[k].map(([id, x, y, rx, ry], i) =>
@@ -591,6 +596,24 @@ $("#grid").innerHTML = SEC.map(([k, n]) => {
     <div class="resize-corner" data-resize-sec="wh" title="Drag corner to resize slice card (double-click to reset)"></div>
   </div>`;
 }).join("");
+
+// Widen every slice's viewBox just enough that no label is cut off (measured from the rendered text)
+function fitSliceViewBoxes() {
+  const groups = { wide: [], narrow: [] };
+  document.querySelectorAll(".sec svg").forEach(svg => {
+    groups[FB[svg.closest(".sec").dataset.slice] ? "wide" : "narrow"].push(svg);
+  });
+  Object.entries(groups).forEach(([kind, list]) => {
+    let need = 0;
+    list.forEach(svg => svg.querySelectorAll("text").forEach(t => {
+      if (!t.getClientRects().length) return;
+      const bb = t.getBBox();
+      need = Math.max(need, bb.x + bb.width);
+    }));
+    const w = Math.max(kind === "wide" ? 400 : 360, Math.ceil(need) + 6);
+    list.forEach(svg => svg.setAttribute("viewBox", `0 0 ${w} 200`));
+  });
+}
 
 function updateSliceImageMode() {
   document.body.dataset.mode = currentMode;
@@ -624,64 +647,250 @@ function getSubNucleiForTract(t) {
   return [...set];
 }
 
-function renderSidebar() {
-  const q = searchQuery.trim().toLowerCase();
+// ---- Spinal cord lesion syndromes ----
+// hit: tract id -> "f" (destroyed) or "p" (partly affected). uni: lesion is on one side only (side toggle).
+// ov(): shading drawn for the RIGHT half of the image; it is mirrored for a left-sided lesion.
+let LSIDE = "R";   // image side of a unilateral lesion: "L" = left half of the slice (the app's Left / Ipsi reference), "R" = right half
+const LES = [
+  {
+    id: "les:cc", n: "Central cord syndrome", aka: "Schneider syndrome", lv: "c", uni: false,
+    cause: "Cervical hyperextension injury in a spondylotic or stenotic canal (typically an older adult after a fall onto the face); also syringomyelia, intramedullary tumour and cervical spondylotic myelopathy.",
+    area: "Central gray matter and the adjacent medial white matter: the spinothalamic fibres crossing in the anterior white commissure, the medial (arm) fibres of the lateral corticospinal tracts and the ventral horns. The dorsal columns and the peripheral (leg and sacral) fibres are spared.",
+    motor: "Upper limb weakness greater than lower limb weakness, with the hands worst affected, because arm fibres lie medially in the corticospinal tract. LMN signs (flaccid weakness, atrophy) at the level from ventral horn damage; UMN signs (spasticity, hyperreflexia) below it.",
+    sens: "Dissociated sensory loss: bilateral cape-like loss of pain and temperature over the shoulders and arms, with light touch, vibration and proprioception preserved. Sacral sensation is often spared.",
+    other: "Urinary retention and bowel dysfunction may occur; burning dysaesthesia of the hands is common. Sacral sparing predicts better recovery.",
+    exam: ["Compare pinprick and temperature (cool tuning fork or ice) with light touch, vibration and joint position over the arms: loss of pain and temperature with preserved dorsal column modalities is the hallmark.", "Grade strength in all four limbs (MRC scale): arms weaker than legs, grip and finger movements worst.", "Reflexes: reduced at the level (LMN), brisk below it; test the Hoffmann sign and plantar responses.", "Look for sacral sparing: perianal sensation, voluntary anal contraction and anal tone.", "Measure the post-void residual volume to assess bladder function."],
+    img: "MRI of the cervical spine: T2 hyperintensity (oedema or haemorrhage) in the central cord, canal stenosis, disc or osteophyte disease, or a syrinx.",
+    hit: { lcst: "p", lst: "p", ast: "p" },
+    ov: () => '<ellipse cx="100" cy="102" rx="52" ry="32"/>'
+  },
+  {
+    id: "les:ac", n: "Anterior cord syndrome", aka: "Anterior spinal artery syndrome \u00b7 Beck syndrome", lv: "c", uni: false,
+    cause: "Anterior spinal artery occlusion or hypoperfusion (aortic surgery or dissection, severe hypotension), flexion injury with an anterior disc or bone fragment, or anterior cord compression.",
+    area: "Anterior two-thirds of the cord: ventral horns, lateral and anterior corticospinal tracts, spinothalamic tracts and the other anterior and lateral funiculus pathways (vestibulospinal, reticulospinal, tectospinal, rubrospinal). The dorsal columns, supplied by the posterior spinal arteries, are spared.",
+    motor: "Bilateral weakness or paralysis below the lesion, flaccid at first (spinal shock) then spastic, with hyperreflexia and Babinski signs. LMN signs at the level of ventral horn damage.",
+    sens: "Bilateral loss of pain, temperature and crude touch below the lesion, with vibration, proprioception and fine touch preserved.",
+    other: "Bladder and bowel dysfunction; autonomic dysfunction in high lesions. This has the poorest motor recovery of the incomplete syndromes.",
+    exam: ["Compare pinprick and temperature (lost) with vibration (128 Hz tuning fork) and joint position sense (preserved) below the level.", "Strength in all limbs: bilateral weakness or paralysis below the level.", "Tone, reflexes and plantar responses: flaccid then spastic, hyperreflexic, extensor plantars.", "Map the sensory level with pinprick up the trunk.", "Perianal sensation, anal tone and post-void residual."],
+    img: "MRI: T2 hyperintensity in the anterior cord, classically the “owl’s eyes” sign on axial images (bilateral anterior horn signal); diffusion MRI and vascular imaging for infarction.",
+    hit: { lcst: "f", acst: "f", lst: "f", ast: "f", rub: "f", vst: "f", prst: "f", mrst: "f", tect: "f", vsc: "p" },
+    ov: () => '<path d="M100,64 L172,64 L174,78 L174,112 L205,112 L205,178 L100,178 Z"/>'
+  },
+  {
+    id: "les:pc", n: "Posterior cord syndrome", aka: "Dorsal column syndrome \u00b7 posterior spinal artery syndrome", lv: "c", uni: false,
+    cause: "Posterior spinal artery occlusion (rare), tabes dorsalis (neurosyphilis), subacute combined degeneration (vitamin B12 deficiency, with lateral column involvement), hyperextension injury, or posterior compression by tumour.",
+    area: "Dorsal columns (fasciculus gracilis and cuneatus) on both sides, sometimes the dorsal horns and the dorsal spinocerebellar tracts. The motor tracts and spinothalamic tracts are spared.",
+    motor: "Strength is preserved, but loss of proprioceptive feedback causes sensory ataxia: a wide-based, stamping gait that worsens in the dark.",
+    sens: "Bilateral loss of vibration, proprioception, fine touch and two-point discrimination below the lesion, with pain and temperature spared. Positive Romberg sign; lightning pains in tabes dorsalis.",
+    other: "Areflexia when reflex afferents are interrupted (tabes); Lhermitte sign; reduced bladder sensation.",
+    exam: ["Vibration with a 128 Hz tuning fork over distal bony prominences (toe, ankle, knee) and joint position sense of the great toe.", "Romberg test: steady with eyes open, unsteady with eyes closed.", "Heel-to-shin and finger-to-nose with eyes open versus closed; look for pseudoathetosis of outstretched fingers.", "Two-point discrimination, graphaesthesia and stereognosis.", "Confirm that pinprick, temperature and strength are normal (dissociated pattern)."],
+    img: "MRI: T2 hyperintensity in the dorsal columns (inverted V sign in B12 deficiency). Blood tests: vitamin B12, syphilis serology.",
+    hit: { dc: "f", dsc: "p" },
+    ov: () => '<path d="M100,28 L146,28 L146,76 L100,76 Z"/>'
+  },
+  {
+    id: "les:bs", n: "Brown-Séquard syndrome", aka: "Spinal cord hemisection syndrome", lv: "c", uni: true,
+    cause: "Penetrating trauma (stab or gunshot), lateral compression by tumour or disc herniation, multiple sclerosis plaque, radiation myelopathy, epidural haematoma or ischaemia. A pure hemisection is rare; most cases are partial (Brown-Séquard plus).",
+    area: "One half of the cord at the level of the lesion: the dorsal column, corticospinal, spinocerebellar and descending pathways on the lesion side, plus the spinothalamic tract on the lesion side (carrying pain and temperature from the opposite side of the body) and the horns at that level.",
+    motor: "Ipsilateral to the lesion: LMN signs (flaccid weakness, atrophy) at the level and UMN signs below it (spastic paralysis, hyperreflexia, Babinski sign).",
+    sens: "Ipsilateral loss of vibration, proprioception and fine touch below the lesion; contralateral loss of pain and temperature starting 1 to 2 segments below it, because spinothalamic fibres cross early. An ipsilateral band of all-modality loss lies at the level.",
+    other: "Ipsilateral Horner syndrome if the lesion is at or above T1; ipsilateral segmental anhidrosis. Bladder function is often preserved because its pathways are bilateral.",
+    exam: ["Compare the two sides: pinprick and temperature on the side opposite the weakness; vibration and joint position on the same side as the weakness.", "Strength and tone side by side: spastic weakness on the lesion side below the level.", "Reflexes: brisk on the lesion side below the level, absent at the level; test the plantar response (Babinski sign).", "Map the sensory level with pinprick up the trunk on both sides and find the upper edge of the ipsilateral all-modality band.", "In cervical lesions, look for Horner syndrome (ptosis, miosis, anhidrosis)."],
+    img: "MRI of the spine at the clinical level: hemicord T2 signal, compressive lesion, haemorrhage or demyelinating plaque; contrast for tumour or inflammation.",
+    hit: { dc: "f", lcst: "f", acst: "f", dsc: "f", vsc: "f", rub: "f", vst: "f", prst: "f", mrst: "f", tect: "f", lst: "f", ast: "f" },
+    ov: () => '<path d="M100,20 L205,20 L205,180 L100,180 Z"/>'
+  },
+  {
+    id: "les:lm", n: "Lateral medullary syndrome", aka: "Wallenberg syndrome \u00b7 PICA syndrome (posterior inferior cerebellar artery) \u00b7 dorsolateral (posterolateral) medullary syndrome",
+    grp: "brain", badge: "Brainstem stroke", where: "rostral medulla", slice: "rostral medulla", lv: "rm", uni: true,
+    vessel: "Intracranial vertebral artery (most often) or posterior inferior cerebellar artery (PICA).",
+    cause: "Ischaemic stroke from occlusion of the intracranial vertebral artery (the most common culprit) or of the PICA: atherothrombosis, cervical artery dissection (especially in younger patients after neck trauma or manipulation) and cardioembolism. Rarely haemorrhage, demyelination or tumour.",
+    area: "Dorsolateral medulla on one side: the spinal trigeminal nucleus and tract, nucleus ambiguus, vestibular nuclei, inferior cerebellar peduncle (with the spinocerebellar fibres entering it), the spinothalamic tract (spinal lemniscus) and the descending sympathetic fibres of the lateral reticular formation. The solitary nucleus and tract are sometimes involved. The medial structures (pyramid, medial lemniscus, hypoglossal nucleus and nerve) are spared.",
+    motor: "Strength is preserved because the pyramid is spared. Ipsilateral palatal, pharyngeal and vocal cord weakness (nucleus ambiguus, CN IX and X): dysphagia, hoarseness, dysarthria, absent gag reflex and a uvula that deviates away from the lesion. Ipsilateral limb ataxia and dysmetria, with falling or lateropulsion toward the lesion side (inferior cerebellar peduncle and vestibular nuclei).",
+    sens: "Ipsilateral loss of pain and temperature on the face (spinal trigeminal nucleus and tract) combined with contralateral loss of pain and temperature on the body and limbs (spinothalamic tract): the classic crossed pattern. Vibration and proprioception are spared because the medial lemniscus is intact.",
+    other: "Ipsilateral Horner syndrome (ptosis, miosis, anhidrosis) from the descending sympathetic fibres; vertigo, nausea, vomiting, nystagmus and oscillopsia from the vestibular nuclei; intractable hiccups; reduced taste if the solitary tract is involved. Aspiration is the main early danger. Opalski syndrome is a variant with ipsilateral hemiparesis, from involvement of the corticospinal fibres after they have crossed.",
+    exam: ["Pinprick and temperature on the face, then on the body: loss on the lesion side of the face and on the opposite side of the body. The corneal reflex may be reduced on the lesion side.", "Palate and voice: ask for \u201cahh\u201d (the uvula deviates away from the lesion), listen for hoarseness, test the gag reflex, and do a bedside swallow screen before any oral intake because of the aspiration risk.", "Eyes: look for ptosis, miosis (more obvious in the dark) and anhidrosis (Horner syndrome) and for nystagmus; the HINTS exam (head impulse, nystagmus, test of skew) separates central from peripheral vertigo.", "Cerebellar tests on the lesion side: finger-to-nose and heel-to-shin; watch sitting balance and gait for veering or falling toward the lesion (lateropulsion).", "Confirm that strength, vibration and proprioception are normal, which separates this from medial medullary syndrome."],
+    img: "MRI with diffusion-weighted imaging (DWI): a posterior fossa infarct can be missed in the first 24 to 48 hours, so repeat it if suspicion stays high. CT or MR angiography of the vertebral arteries and PICA to look for dissection or occlusion.",
+    hit: { cn5: "f", sl: "f", dsc: "f", cun: "f", "cn9|Nucleus ambiguus": "f", "cn10|Nucleus ambiguus": "f", "cn8|Inferior vestibular nucleus": "f", "cn8|Medial vestibular nucleus": "p", "cn9|Nucleus tractus solitarius": "p", vst: "p", vsc: "p", rub: "p" },
+    ov: () => '<path d="M126,36 L200,36 L200,134 L164,134 L164,110 L138,110 L136,84 L128,64 Z"/>'
+  },
+  {
+    id: "les:mm", n: "Medial medullary syndrome", aka: "Dejerine syndrome (D\u00e9j\u00e9rine anterior bulbar syndrome) \u00b7 inferior alternating hemiplegia \u00b7 hypoglossal alternating hemiplegia",
+    grp: "brain", badge: "Brainstem stroke", where: "rostral medulla", slice: "rostral medulla", lv: "rm", uni: true,
+    vessel: "Anterior spinal artery (from the vertebral arteries) or paramedian branches of the vertebral artery.",
+    cause: "Infarction of the paramedian medulla from occlusion of the anterior spinal artery or of the vertebral artery and its paramedian branches: atherothrombosis, vertebral artery dissection, small vessel disease or embolism. Both sides can be involved because the anterior spinal artery supplies both.",
+    area: "Paramedian medulla on one side: the pyramid (corticospinal fibres), the medial lemniscus and the hypoglossal nerve rootlets running between the pyramid and the olive. The hypoglossal nucleus, medial longitudinal fasciculus and tectospinal tract are affected only if the lesion extends dorsally. The lateral structures (spinal trigeminal, nucleus ambiguus, spinothalamic tract, inferior cerebellar peduncle) are spared.",
+    motor: "Contralateral hemiparesis of the arm and leg with upper motor neuron signs (the pyramidal fibres have not yet crossed), sparing the face. Ipsilateral tongue weakness: the tongue deviates toward the lesion on protrusion (hypoglossal lower motor neuron lesion), with atrophy and fasciculations later. \u201cAlternating\u201d means cranial nerve signs on the lesion side and limb signs on the opposite side.",
+    sens: "Contralateral loss of vibration, proprioception and fine touch of the trunk and limbs (medial lemniscus), sparing the face. Pain and temperature are spared because the spinothalamic tract lies laterally.",
+    other: "No Horner syndrome, dysphagia or ataxia, because the lateral structures are intact. Upbeat or downbeat nystagmus can occur if the MLF is involved. Bilateral infarction (the \u201cheart appearance\u201d sign on MRI) causes quadriparesis with tongue paralysis and can resemble locked-in syndrome. Not to be confused with Dejerine-Roussy syndrome (thalamic pain) or Dejerine-Sottas disease.",
+    exam: ["Test strength in the arms and legs on both sides (MRC scale) and confirm the face is normal; check tone, reflexes and the plantar response on the weak side.", "Ask the patient to stick out the tongue: it deviates toward the lesion; look for wasting and fasciculations.", "Vibration (128 Hz tuning fork) and joint position sense: reduced on the weak side; Romberg may be positive.", "Confirm that pinprick and temperature are normal on the face and body, and that swallowing, voice and the gag reflex are intact.", "Check eye movements for upbeat or downbeat nystagmus if the lesion may extend dorsally."],
+    img: "MRI with DWI: a paramedian medullary infarct (heart-shaped when bilateral). CT or MR angiography of the vertebral arteries to look for dissection, stenosis or occlusion.",
+    hit: { lcst: "f", ml: "f", "cn12|Hypoglossal nerve rootlets": "f", mlf: "p", tect: "p" },
+    ov: () => '<path d="M100,66 L120,66 L120,150 L134,150 L134,176 L100,176 Z"/>'
+  }
+];
+
+function lesionOverlay(L) {
+  const shape = L.ov();
+  const inner = L.uni && LSIDE === "L" ? `<g transform="translate(200,0) scale(-1,1)">${shape}</g>` : shape;
+  const mirrored = L.uni ? "" : `<g transform="translate(200,0) scale(-1,1)">${shape}</g>`;   // bilateral lesions are drawn on both halves
+  return `<g clip-path="url(#clip-${L.lv})">${inner}${mirrored}</g>
+    <text class="lb lov-side" x="32" y="186">Left side</text><text class="lb lov-side" x="168" y="186">Right side</text>`;
+}
+
+// A lesion's hit map is keyed by tract id, or by "id|name" to single out one structure that shares an id (e.g. the nucleus ambiguus under CN IX)
+const hitName = e => ((e.querySelector("title") || {}).textContent || "").replace(/ \((Left|Right).*$/, "");
+const hitOf = (L, id, name) => (name !== undefined && L.hit[id + "|" + name]) || L.hit[id];
+
+function lesionPaint(L) {
+  document.querySelectorAll(".lov").forEach(g => { g.innerHTML = ""; });
+  document.querySelectorAll(".sh.hit, .sh.part").forEach(e => e.classList.remove("hit", "part"));
+  document.querySelectorAll(".blk.lesion-lv").forEach(b => b.classList.remove("lesion-lv"));
+  if (!L) { applyFilter(); return; }
+  const g = document.querySelector(`#s-${L.lv} .lov`);
+  if (g) g.innerHTML = lesionOverlay(L);
+  const side = e => !L.uni || e.dataset.side === LSIDE;
+  document.querySelectorAll(`#s-${L.lv} .lg`).forEach(e => {
+    const h = hitOf(L, e.dataset.id, (e.querySelector(".lab") || {}).textContent);
+    e.classList.toggle("on", !!h);
+    e.classList.toggle("dim", !h);
+    if (h) e.classList.remove("fo");   // a filter such as "Lesions" must not fade the labels of involved structures
+  });
+  document.querySelectorAll(`#s-${L.lv} .ar, #s-${L.lv} .dec-path, #s-${L.lv} .dec-marker`).forEach(e => {
+    if (L.hit[e.dataset.id]) e.classList.remove("fo");
+  });
+  document.querySelectorAll(`#s-${L.lv} .sh`).forEach(e => {
+    const h = hitOf(L, e.dataset.id, hitName(e));
+    if (h && side(e)) { e.classList.remove("dim", "fo"); e.classList.add("on", h === "f" ? "hit" : "part"); }
+    else { e.classList.remove("on"); e.classList.add("dim"); }
+  });
+  document.querySelectorAll(`#s-${L.lv} .ar`).forEach(e => e.classList.toggle("on", !!L.hit[e.dataset.id] && side(e)));
+  // a lesion lives on one slice: switch the tract highlighting off everywhere else
+  document.querySelectorAll(".sec").forEach(sec => {
+    if (sec.dataset.slice === L.lv) return;
+    sec.querySelectorAll(".on").forEach(e => { e.classList.remove("on"); e.classList.add("dim"); });
+    sec.classList.remove("has-active", "has-active-dec");
+    sec.classList.toggle("filtered-out", filterActiveOnly && !!sel);
+    const sb = sec.querySelector(".sec-side-badge");
+    if (sb) sb.textContent = "";
+  });
+  document.querySelectorAll(".blk").forEach(b => { if ((SEC_TO_LONG[L.lv] || []).includes(b.dataset.s)) b.classList.add("lesion-lv"); });
+  applyFilter();   // re-apply filter fading now that the lit set is final (the lesion's own structures are exempt)
+}
+
+function lesInfo(L) {
+  const row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
+  const pills = Object.entries(L.hit).map(([key, h]) => {
+    const [id, nm] = key.split("|");
+    const t = T.find(x => x.id === id);
+    return t ? `<button type="button" class="rel-pill" data-jump-id="${t.id}" title="${h === "f" ? "Damaged" : "May be partly affected"}"><span class="dot" style="background:${t.col}"></span>${nm || t.n}${h === "p" ? " (partly)" : ""}</button>` : "";
+  }).join("");
+  const sideRow = L.uni ? `<div class="les-side">Lesion side shown:
+      <button type="button" class="sdb${LSIDE === "L" ? " on" : ""}" data-sd="L">Left half</button>
+      <button type="button" class="sdb${LSIDE === "R" ? " on" : ""}" data-sd="R">Right half</button></div>` : "";
+  return `
+    <div class="info-top">
+      <div class="info-title-wrap">
+        <h2 style="--c:#d0242a">${L.n}</h2>
+        <span class="bdg" style="background:#d0242a">${L.badge || "Spinal cord lesion"}</span>
+        <span class="bdg-dec">${L.uni ? "Unilateral" : "Bilateral"}</span>
+      </div>
+      ${sel ? `<button type="button" class="unpin-btn" id="unpin-btn">Unpin ✕</button>` : ""}
+    </div>
+    ${L.aka ? `<div class="les-aka">Also called: ${L.aka}</div>` : ""}
+    ${sideRow}
+    <p class="les-legend">Shown on the <strong>${L.slice || "cervical spinal cord"}</strong> slice: the shaded area is the lesion, <span class="lg-hit">red</span> tracts are damaged, <span class="lg-part">amber</span> tracts may be partly affected, and the rest are dimmed.</p>
+    <dl>
+      ${row("Cause", L.cause)}${L.vessel ? row("Blood supply", L.vessel) : ""}${row("Affected", L.area)}${row("Motor", L.motor)}${row("Sensory", L.sens)}${row("Other signs", L.other)}
+      ${row("How to check", "<ul>" + L.exam.map(x => `<li>${x}</li>`).join("") + "</ul>")}${row("Imaging", L.img)}
+    </dl>
+    <div class="related-pills"><span style="font-size:11px;color:var(--mut);align-self:center">Tracts involved:</span>${pills}</div>`;
+}
+
+// ---- Sidebar: built once, then filtered in place (search + category chip + level) ----
+const TAG = { dc: "s", ast: "s", lst: "s", ml: "s", sl: "s", tl: "s", ll: "s", cb: "m", lcst: "m", acst: "m", vst: "m", prst: "m", mrst: "m", rub: "m", crb: "m", tect: "m", ns: "m", mlf: "m", dsc: "c", vsc: "c", cun: "c", pcb: "c", olcb: "c", dtc: "c" };
+T.forEach(t => { t.tag = TAG[t.id] || "n"; });   // s sensory, m motor, c cerebellar, n cranial nerve
+
+const REGION = {};
+FB.cx.forEach(e => { REGION[e[0]] = "Cortex"; });
+FB.th.forEach(e => { REGION[e[0]] = ["CAU", "PUT", "GPE", "GPI", "STN", "SN"].includes(e[0]) ? "Basal ganglia" : "Thalamus"; });
+FB.cbl.forEach(e => { REGION[e[0]] = "Cerebellum"; });
+
+const LEVEL_NAMES = { cx: "Cerebral cortex", th: "Thalamus & basal ganglia", rmb: "Rostral midbrain", cmb: "Caudal midbrain", rp: "Rostral pons", cp: "Caudal pons", cbl: "Cerebellum", rm: "Rostral medulla", mm: "Mid medulla", cm: "Caudal medulla", c: "Cervical spinal cord" };
+$("#level-filter").innerHTML = `<option value="">Present at any level</option>` + SEC.map(([k]) => `<option value="${k}">${LEVEL_NAMES[k] || k}</option>`).join("");
+
+const F = { q: "", k: "", l: "" };
+let sideBuilt = false;
+
+function buildSidebar() {
   let html = "";
-  let totalMatches = 0;
-
-  if (activeCategory !== "st") {
-    G.forEach(([groupName, dCode]) => {
-      if (activeCategory !== "all" && activeCategory !== dCode) return;
-      const items = T.filter(t => {
-        if (t.d !== dCode) return false;
-        if (!q) return true;
-        const subNuc = getSubNucleiForTract(t).join(" ").toLowerCase();
-        const hay = `${t.n} ${t.id} ${subNuc} ${t.o || ""} ${t.f || ""} ${t.l || ""} ${t.x || ""}`.toLowerCase();
-        return hay.includes(q);
-      });
-      if (!items.length) return;
-      totalMatches += items.length;
-      html += `<h3><span>${groupName}</span><span>${items.length}</span></h3>`;
-      html += items.map(t => {
-        const subNuc = getSubNucleiForTract(t);
-        const matchedSub = q && subNuc.find(sn => sn.toLowerCase().includes(q));
-        return `<button class="it${sel === t.id ? " sel" : ""}" data-id="${t.id}" style="--c:${t.col}">
-          <span class="dot" style="background:${t.col}"></span>
-          <span class="it-text">
-            ${t.n}
-            ${matchedSub ? `<span class="it-sub">↳ ${matchedSub}</span>` : ""}
-          </span>
-          <span class="dr">${AR[dCode]}</span>
-        </button>`;
-      }).join("");
-    });
-  }
-
-  if (activeCategory === "st" || (activeCategory === "all" && q.length > 0)) {
-    const stItems = Object.entries(ST).filter(([id, [name, desc]]) => {
-      if (!q) return true;
-      return `${id} ${name} ${desc}`.toLowerCase().includes(q);
-    });
-    if (stItems.length) {
-      totalMatches += stItems.length;
-      html += `<h3><span>Brain Structures &amp; Nuclei</span><span>${stItems.length}</span></h3>`;
-      html += stItems.map(([id, [name, desc]]) =>
-        `<button class="it${sel === id ? " sel" : ""}" data-id="${id}" style="--c:var(--acc)">
-          <span class="dot" style="background:var(--acc)"></span>
-          <span class="it-text">
-            ${name}
-            <span class="it-sub">${id} · ${desc.slice(0, 48)}…</span>
-          </span>
-          <span class="dr">●</span>
-        </button>`
-      ).join("");
-    }
-  }
-
-  if (!totalMatches) {
-    html = `<div class="empty-search">No tracts, nuclei, or clinical syndromes match "<strong>${searchQuery}</strong>".</div>`;
-  }
+  G.forEach(([groupName, dCode]) => {
+    html += `<h3><span>${groupName}</span><span></span></h3>`;
+    html += T.filter(t => t.d === dCode).map(t =>
+      `<button class="it" data-id="${t.id}" style="--c:${t.col}">
+        <span class="dot" style="background:${t.col}"></span>
+        <span class="it-text">${t.n}</span>
+        <span class="dr">${AR[dCode]}</span>
+      </button>`).join("");
+  });
+  const lesItem = l =>
+    `<button class="it les-it" data-id="${l.id}" style="--c:#d0242a">
+      <span class="dot" style="background:#d0242a"></span>
+      <span class="it-text">${l.n}<span class="it-sub">${l.uni ? "unilateral" : "bilateral"} · ${l.where || "cervical cord"}</span></span>
+      <span class="dr">⚠</span>
+    </button>`;
+  html += `<h3><span>Spinal cord lesions</span><span></span></h3>` + LES.filter(l => l.grp !== "brain").map(lesItem).join("");
+  html += `<h3><span>Brainstem strokes</span><span></span></h3>` + LES.filter(l => l.grp === "brain").map(lesItem).join("");
+  html += `<h3><span>Brain structures &amp; nuclei</span><span></span></h3>`;
+  html += Object.entries(ST).map(([id, [name]]) =>
+    `<button class="it st-it" data-id="${id}" style="--c:var(--acc)">
+      <span class="dot" style="background:var(--acc)"></span>
+      <span class="it-text">${name}<span class="it-sub">${REGION[id] || "Structure"}</span></span>
+      <span class="dr">●</span>
+    </button>`).join("");
   $("#side").innerHTML = html;
+}
+
+function applyFilter() {
+  const terms = F.q.toLowerCase().split(/\s+/).filter(Boolean), ok = new Set();
+  T.forEach(t => {
+    if (!t.blob) t.blob = (`${t.n} ${t.id} ${[t.o, t.c, t.x, t.t, t.f, t.l].join(" ")} ${getSubNucleiForTract(t).join(" ")}`).toLowerCase();
+    if ((!F.k || t.tag === F.k) && (!F.l || getSlicesForItem(t.id).includes(F.l)) && terms.every(w => t.blob.includes(w))) ok.add(t.id);
+  });
+  const nt = ok.size, on = !!(F.q || F.k || F.l), sOn = !!F.q && !F.k && !F.l;
+  let nl = 0;   // lesion syndromes: shown under "All" and "Lesions", searched by text, present at the cord level only
+  LES.forEach(l => {
+    if (!l.blob) l.blob = `${l.n} ${l.aka || ""} ${[l.cause, l.vessel || "", l.area, l.motor, l.sens, l.other, l.img].join(" ")} ${l.exam.join(" ")}`.toLowerCase();
+    if ((!F.k || F.k === "l") && (!F.l || F.l === l.lv) && terms.every(w => l.blob.includes(w))) { ok.add(l.id); nl++; }
+  });
+  let ns = 0;   // structures are searched only by text (not by category chip or level)
+  Object.entries(ST).forEach(([id, v]) => {
+    if (sOn && terms.every(w => `${v[0]} ${v[1]} ${id} ${REGION[id] || ""}`.toLowerCase().includes(w))) { ok.add(id); ns++; }
+  });
+  document.querySelectorAll("#side .it").forEach(e => { e.hidden = !ok.has(e.dataset.id); });
+  document.querySelectorAll("#side h3").forEach(h => {
+    let e = h.nextElementSibling, n = 0;
+    while (e && e.classList.contains("it")) { if (!e.hidden) n++; e = e.nextElementSibling; }
+    h.hidden = !n;
+    h.lastElementChild.textContent = n;
+  });
+  // fade tracts that do not match, everywhere they are drawn
+  document.querySelectorAll(".sh, .lg, .ar, .dec-path, .dec-marker").forEach(e => {
+    e.classList.toggle("fo", on && !ok.has(e.dataset.id));
+  });
+  // the filter only fades the right-hand panels while nothing is selected: a pinned item switches it off entirely,
+  // and a hover preview keeps its own highlighted structures lit
+  if (sel) document.querySelectorAll(".fo").forEach(e => e.classList.remove("fo"));
+  else if (hov) document.querySelectorAll(".on.fo").forEach(e => e.classList.remove("fo"));
+  $("#filter-count").textContent = on
+    ? `${nt} of ${T.length} shown` + (ns ? ` + ${ns} structure${ns > 1 ? "s" : ""}` : "") + (nl ? ` + ${nl} lesion${nl > 1 ? "s" : ""}` : "") + (nt || ns || nl ? "" : " (no matches)")
+    : `${T.length} tracts and nerves · ${LES.length} lesion syndromes`;
+}
+
+function renderSidebar() {
+  if (!sideBuilt) { buildSidebar(); sideBuilt = true; }
+  applyFilter();
+  document.querySelectorAll("#side .it").forEach(e => e.classList.toggle("sel", e.dataset.id == sel));
 }
 
 const LV = [
@@ -713,11 +922,14 @@ function layout() {
 }
 
 let shown;
+let lastBrainSel; // last pinned item pushed to the 3D brain (avoids re-sending on every hover)
 let currentPathwaySlices = [];
 let currentStepIdx = 0;
 
 function getSlicesForItem(c) {
   if (!c) return [];
+  const lesion = LES.find(l => l.id === c);
+  if (lesion) return [lesion.lv];
   const S0 = ST[c];
   if (S0) {
     const sList = [];
@@ -750,9 +962,10 @@ function pickBestSpotlightForItem(c, activeSlices) {
 }
 
 function paint() {
-  const c = sel;
+  const c = sel || hov;   // highlighted item: pinned one wins, otherwise the hovered one
   const S0 = ST[c];
-  const A = new Set(S0 ? T.filter(t => (TG[t.id] || []).includes(c)).map(t => t.id) : c ? [c] : []);
+  const LS = LES.find(l => l.id === c);   // a lesion syndrome is highlighted through the tracts it damages
+  const A = new Set(LS ? Object.keys(LS.hit).map(k => k.split("|")[0]) : S0 ? T.filter(t => (TG[t.id] || []).includes(c)).map(t => t.id) : c ? [c] : []);
   const activeTract = T.find(x => x.id === c);
 
   document.querySelectorAll(".sec").forEach(secEl => {
@@ -817,10 +1030,11 @@ function paint() {
     }
 
     // Filter out non-active slices when a tract/structure is selected and filterActiveOnly is on
-    secEl.classList.toggle("filtered-out", filterActiveOnly && !!c && !secHasActive);
+    secEl.classList.toggle("filtered-out", filterActiveOnly && !!sel && !secHasActive);
   });
 
   document.querySelectorAll(".it").forEach(e => e.classList.toggle("sel", e.dataset.id == sel));
+  lesionPaint(LS);
 
   // 2D Longitudinal Schematic Flow + Crossover Nodes
   const flEl = $("#fl");
@@ -848,10 +1062,14 @@ function paint() {
   }
 
   // Update 3D Brain Pathway & Slice Highlights
-  const activeSlices = getSlicesForItem(c);
-  if (brain3d) {
-    brain3d.setTractPathway(activeTract || null);
+  const activeSlices = getSlicesForItem(sel);   // only a pinned item filters slices / drives the 3D view
+  const selTract = T.find(x => x.id === sel);
+  const selLes = LES.find(l => l.id === sel);
+  if (brain3d && lastBrainSel !== sel) {
+    lastBrainSel = sel;
+    brain3d.setTractPathway(selTract || null);
     brain3d.highlightTractSlices(new Set(activeSlices));
+    if (selLes) brain3d.setActiveSlice(selLes.lv);
   }
 
   currentPathwaySlices = activeSlices;
@@ -859,7 +1077,7 @@ function paint() {
   const showAllBtn = $("#show-all-slices-btn");
   const statusEl = $("#grid-status");
 
-  if (c && activeSlices.length > 0) {
+  if (sel && activeSlices.length > 0) {
     stepper.classList.remove("hidden");
     showAllBtn.classList.toggle("hidden", !filterActiveOnly);
     const spotIdx = activeSlices.indexOf(spotlightSlice);
@@ -867,7 +1085,7 @@ function paint() {
     else if (currentStepIdx >= activeSlices.length) currentStepIdx = 0;
     $("#step-indicator").textContent = `Slice ${currentStepIdx + 1} / ${activeSlices.length}`;
     statusEl.textContent = filterActiveOnly
-      ? `Showing ${activeSlices.length} active slices for ${activeTract ? activeTract.n : ST[c][0]} · Click any slice to Spotlight`
+      ? `Showing ${activeSlices.length} active slices for ${selTract ? selTract.n : selLes ? selLes.n : ST[sel][0]} · Click any slice to Spotlight`
       : `Highlighted across ${activeSlices.length} of 11 levels`;
   } else {
     stepper.classList.add("hidden");
@@ -876,11 +1094,18 @@ function paint() {
   }
 
   // Update Inspector Card (#info)
-  const k = sel;
-  if (k === shown) return;
-  shown = k;
+  const k = sel || hov;
+  const infoKey = (sel ? "S:" : "H:") + k + (LS && LS.uni ? LSIDE : "");   // hover preview and pinned view render differently (Unpin button)
+  if (infoKey === shown) return;
+  shown = infoKey;
   $("#info").scrollTop = 0;
   const i = T.find(x => x.id == k), s = ST[k];
+
+  if (LS) {
+    $("#info").style.setProperty("--c", "#d0242a");
+    $("#info").innerHTML = lesInfo(LS);
+    return;
+  }
 
   if (s) {
     const relTracts = T.filter(t => (TG[t.id] || []).includes(k));
@@ -933,22 +1158,17 @@ function paint() {
         <h2>Explore a Tract, Cranial Nerve, or Brain Nucleus</h2>
       </div>
       <p style="color:var(--mut);margin:0">
-        Select any tract on the left to automatically pull up only the slices where it is present, with its key slice expanded in <strong>Spotlight</strong> mode. Click <strong>⤢ Spotlight</strong> on any other slice to make it the largest zoomed view.
+        Select any tract on the left to pull up only the slices where it is present. Hover over any tract, nerve or structure to preview it, and click to pin it. Click <strong>⤢ Spotlight</strong> on any slice to make it the largest zoomed view.
       </p>`;
   }
 }
 
 function selectItem(id) {
   sel = sel === id ? null : id;
+  hov = null;
   currentStepIdx = 0;
-  if (sel) {
-    const slices = getSlicesForItem(sel);
-    const best = pickBestSpotlightForItem(sel, slices);
-    spotlightSlice = null;
-    if (best) setSpotlightSlice(best, false);
-  } else {
-    setSpotlightSlice(null, false);
-  }
+  // no automatic Spotlight; only drop one that the pinned item's filter would hide
+  if (sel && filterActiveOnly && spotlightSlice && !getSlicesForItem(sel).includes(spotlightSlice)) setSpotlightSlice(spotlightSlice, false);
   paint();
   renderSidebar();
 }
@@ -974,9 +1194,15 @@ const pick = e => {
   return el ? el.dataset.id : null;
 };
 
-// Click-only selection (hovering does not change the active selection or filter slices)
+// Clicking pins / unpins (hovering only previews, see below)
 document.addEventListener("click", e => {
   if (e.target.closest("#quiz-stage") || e.target.closest(".modal-backdrop")) return;
+  const sdb = e.target.closest(".sdb");
+  if (sdb) {   // switch the side of a unilateral lesion
+    LSIDE = sdb.dataset.sd;
+    paint();
+    return;
+  }
   if (e.target.closest("#unpin-btn")) {
     selectItem(sel); // toggles off
     return;
@@ -1011,45 +1237,69 @@ document.addEventListener("click", e => {
 });
 
 // Search Bar & Category Tabs Events
+// Hover previews whatever is under the pointer while nothing is pinned; once an item is pinned, only clicks change it
+let hovTimer;
+document.addEventListener("mouseover", e => {
+  if (sel) return;
+  if (e.target.closest("#quiz-stage, .modal-backdrop")) return;
+  if (e.target.closest("#info")) { clearTimeout(hovTimer); return; }   // keep the preview while the pointer is on it (to scroll or use its pills)
+  const id = pick(e);
+  clearTimeout(hovTimer);
+  if (id) {
+    if (id !== hov) { hov = id; paint(); }
+  } else if (hov) {
+    hovTimer = setTimeout(() => { if (!sel && hov) { hov = null; paint(); } }, 250);
+  }
+});
+
 const searchInput = $("#search-input");
 const searchClear = $("#search-clear");
 const searchKbd = $("#search-kbd");
 
 searchInput.addEventListener("input", () => {
-  searchQuery = searchInput.value;
-  searchClear.classList.toggle("hidden", !searchQuery);
-  searchKbd.classList.toggle("hidden", !!searchQuery);
-  renderSidebar();
+  F.q = searchInput.value;
+  searchClear.classList.toggle("hidden", !F.q);
+  searchKbd.classList.toggle("hidden", !!F.q);
+  applyFilter();
 });
 
 searchClear.addEventListener("click", () => {
   searchInput.value = "";
-  searchQuery = "";
+  F.q = "";
   searchClear.classList.add("hidden");
   searchKbd.classList.remove("hidden");
-  renderSidebar();
+  applyFilter();
   searchInput.focus();
 });
 
 document.addEventListener("keydown", e => {
-  if (e.key === "/" && document.activeElement !== searchInput) {
+  const a = document.activeElement;
+  if (e.key === "/" && !/INPUT|SELECT|TEXTAREA/.test(a.tagName)) {   // never steal "/" from a text field (e.g. the quiz answer box)
     e.preventDefault();
     searchInput.focus();
   } else if (e.key === "Escape") {
-    if (document.activeElement === searchInput && searchQuery) {
-      searchClear.click();
-    } else if (sel) {
-      selectItem(sel);
-    }
+    if (a === searchInput && F.q) searchClear.click();
+    else if (sel) selectItem(sel);
   }
 });
 
 $("#cat-tabs").addEventListener("click", e => {
   const btn = e.target.closest(".cat-tab");
   if (!btn) return;
-  activeCategory = btn.dataset.cat;
+  F.k = btn.dataset.cat;
   document.querySelectorAll(".cat-tab").forEach(b => b.classList.toggle("active", b === btn));
-  renderSidebar();
+  applyFilter();
+});
+
+$("#level-filter").addEventListener("change", e => {
+  F.l = e.target.value;
+  applyFilter();
+  const s = F.l && $("#s-" + F.l);
+  if (s && !s.classList.contains("filtered-out")) {
+    s.scrollIntoView({ behavior: "smooth", block: "center" });
+    s.classList.add("fl");
+    setTimeout(() => s.classList.remove("fl"), 1300);
+  }
 });
 
 // Toolbar Controls
@@ -2058,6 +2308,7 @@ setSz();
 
   function exitQuizMode() {
     quizState = null;
+    lastBrainSel = undefined;
     document.body.classList.remove("quiz-active");
     quizStage.classList.add("hidden");
     quizStage.innerHTML = "";
@@ -2075,5 +2326,16 @@ try {
 
 new ResizeObserver(layout).observe($("#dsv-wrap"));
 renderSidebar();
+fitSliceViewBoxes();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitSliceViewBoxes);
 layout();
 paint();
+
+// Keep sticky panels clear of the pinned top bar: publish its real height as --topbar-h
+(function trackTopbar() {
+  const bar = $("#topbar");
+  const update = () => document.documentElement.style.setProperty("--topbar-h", Math.round(bar.getBoundingClientRect().height) + "px");
+  new ResizeObserver(update).observe(bar);
+  window.addEventListener("resize", update);
+  update();
+})();

@@ -97,13 +97,16 @@
         <button type="button" id="search-clear" class="hidden" aria-label="Clear search">&times;</button>
       </div>
 
-      <div class="cat-tabs" id="cat-tabs" role="tablist">
-        <button type="button" class="cat-tab active" data-cat="all">All</button>
-        <button type="button" class="cat-tab" data-cat="a" title="Ascending Sensory Pathways">▲ Asc</button>
-        <button type="button" class="cat-tab" data-cat="d" title="Descending Motor Pathways">▼ Desc</button>
-        <button type="button" class="cat-tab" data-cat="n" title="Cranial Nerves I–XII">◆ CN</button>
-        <button type="button" class="cat-tab" data-cat="st" title="Cortical, Thalamic, Basal Ganglia & Cerebellar Structures">● Nuclei</button>
+      <div class="cat-tabs" id="cat-tabs" role="group" aria-label="Filter by category">
+        <button type="button" class="cat-tab active" data-cat="">All</button>
+        <button type="button" class="cat-tab" data-cat="s" title="Ascending sensory pathways">Sensory</button>
+        <button type="button" class="cat-tab" data-cat="m" title="Motor and descending pathways">Motor</button>
+        <button type="button" class="cat-tab" data-cat="c" title="Cerebellar pathways">Cerebellar</button>
+        <button type="button" class="cat-tab" data-cat="n" title="Cranial nerves I–XII">Cranial nerves</button>
+        <button type="button" class="cat-tab" data-cat="l" title="Spinal cord and medullary lesion syndromes">Lesions</button>
       </div>
+      <select id="level-filter" class="level-select" aria-label="Show only tracts present at a level"></select>
+      <div id="filter-count" class="filter-count" aria-live="polite"></div>
 
       <nav id="side" aria-label="Pathway list"></nav>
       <div class="resize-edge resize-edge-r" id="resize-side" title="Drag edge to resize sidebar width (double-click to reset)"></div>
@@ -195,11 +198,15 @@
       <div class="modal-body help-grid">
         <div class="help-item">
           <h3>1. Explore Tracts, Nerves &amp; Nuclei</h3>
-          <p>Click any pathway, cranial nerve (<strong>CN I–XII</strong>), or brain nucleus in the left directory—or click directly on any structure inside a cross-section slice—to select it. Selecting a pathway automatically filters the view to the slices where it is present and opens its key level in <strong>Spotlight</strong> mode.</p>
+          <p>Click any pathway, cranial nerve (<strong>CN I–XII</strong>), or brain nucleus in the left directory—or click directly on any structure inside a cross-section slice—to select it. Hover to preview an item; click to pin it. A pinned pathway filters the view to the slices where it is present (use <strong>⤢ Spotlight</strong> on any slice to enlarge it).</p>
         </div>
         <div class="help-item">
           <h3>2. Search by Anatomy or Clinical Syndrome</h3>
           <p>Press <kbd>/</kbd> to search across tracts, sub-nuclei (e.g., <em>Nucleus ambiguus</em>, <em>Edinger-Westphal</em>), or clinical syndromes (e.g., <em>Wallenberg</em>, <em>Weber</em>, <em>Brown-Séquard</em>, <em>INO</em>, <em>Horner</em>).</p>
+        </div>
+        <div class="help-item">
+          <h3>2b. Lesion Syndromes</h3>
+          <p>Pick a spinal cord lesion (<em>central cord</em>, <em>anterior cord</em>, <em>posterior cord</em>, <em>Brown-Séquard</em>) or a medullary stroke (<em>lateral medullary / Wallenberg</em>, <em>medial medullary / Dejerine</em>) from the <strong>Spinal cord lesions</strong> and <strong>Brainstem strokes</strong> groups or the <strong>Lesions</strong> chip. The affected slice shades the lesion, marks damaged tracts in red, and the inspector lists the cause, deficits, bedside tests (<strong>How to check</strong>) and imaging. Unilateral lesions have a Left / Right toggle.</p>
         </div>
         <div class="help-item">
           <h3>3. 3D Brain &amp; 2D Longitudinal Schematic</h3>
